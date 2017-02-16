@@ -1,2 +1,7 @@
 # jmgo
-A clone of Go's mgo in Java
+
+用Java对Go的mongo驱动进行拙劣的模仿，主要是两个目的：学习Java；学习mongo的驱动要怎么写；
+
+拙劣模仿了一点点，我就感受到Go写代码是多么方便简单省键盘，Java的概念实在是太多了，光是并发编程这一块的概念就非常非常多，而Go就一个goroutine。。。
+
+今年的目标是钻研大数据方向，打算是从jstorm开始，不过目前对Java仍停留在最基本的语法认知上，所以想靠写这么一个项目，熟悉下Java的编程，特别是Java 8.
