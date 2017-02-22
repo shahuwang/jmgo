@@ -1,11 +1,12 @@
 package com.shahuwang.server;
 
-import com.shahuwang.connection.MongoSocket;
+import com.shahuwang.connection.*;
 
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Vector;
 import java.util.concurrent.locks.ReadWriteLock;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -15,6 +16,7 @@ import org.apache.logging.log4j.Logger;
 public class MongoServer {
     private ReadWriteLock rwlock;
     private String addr;
+    private String resolvedAddr;
     private InetSocketAddress tcpaddr;
     private Vector<MongoSocket> unusedSockets;
     private Vector<MongoSocket> liveSockets;
@@ -37,12 +39,26 @@ public class MongoServer {
         this.pingValue = Duration.ofHours(1);
     }
 
-    public MongoSocket connect(Duration timeout){
+    public MongoSocket connect(Duration timeout)throws MgoException{
         this.rwlock.readLock().lock();
         // 保证master 和 dialer是一致的同步的
         boolean master = this.info.isMaster();
         Dialer dial = this.dial;
         this.rwlock.readLock().unlock();
         logger.info("Establishing new connection to %s (timeout=%d)...", this.addr, timeout.getSeconds());
+        IConn conn;
+        if(!this.dial.isSet()){
+            conn = new ResolvedAddrConn(this.resolvedAddr, timeout);
+        }else if(this.dial.getOld() != null) {
+            conn = this.dial.getOld().dial(this.tcpaddr);
+        }else if(this.dial.getNew() != null){
+            ServerAddr saddr = new ServerAddr(this.addr, this.tcpaddr);
+            conn = this.dial.getNew().dial(saddr);
+        } else{
+            throw new MgoException("dialer is set, but both dial.old and dial.new are null");
+        }
+        logger.info("connection to %s established.", this.addr);
+        Stats.getInstance().conn(1, master);
+        return new MongoSocket(this, conn, timeout);
     }
 }
