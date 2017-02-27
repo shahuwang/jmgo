@@ -5,9 +5,11 @@ import com.shahuwang.jmgo.utils.SyncChan;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.bson.BsonElement;
 
 import java.net.Socket;
 import java.time.Duration;
+import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -159,7 +161,28 @@ public class MongoServer {
         return info;
     }
 
+    protected boolean hasTags(BsonElement [][] serverTags){
+        nextTagSet:
+        for(BsonElement [] tags: serverTags){
+            nextReqTag:
+            for(BsonElement req: tags){
+                for(BsonElement has: this.serverInfo.getTags()){
+                    if (req.getName() == has.getName()){
+                        if (req.getValue() == has.getValue()){
+                            continue nextReqTag;
+                        }
+                        continue nextTagSet;
+                    }
+                }
+                continue nextTagSet;
+            }
+            return true;
+        }
+        return false;
+    }
+
     protected void pinger(boolean loop){
+
 
     }
 

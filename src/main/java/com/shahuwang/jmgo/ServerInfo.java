@@ -35,4 +35,8 @@ public class ServerInfo {
     public void setMongos(boolean mongos) {
         this.mongos = mongos;
     }
+
+    public List<BsonElement> getTags() {
+        return tags;
+    }
 }
