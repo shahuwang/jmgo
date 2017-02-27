@@ -21,6 +21,11 @@ public class SyncChan<E> {
         }
     }
 
+    public void offer(E e){
+        // 非阻塞添加，如果队列已满，直接不添加，返回
+        this.queue.offer(e);
+    }
+
     public E take() {
         try{
             return this.queue.take();
