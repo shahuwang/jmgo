@@ -2,8 +2,6 @@ package com.shahuwang.jmgo;
 
 import junit.framework.TestCase;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -15,7 +13,7 @@ public class Test extends TestCase{
     public void testLoadProperties() {
         Properties prop = new Properties();
         try{
-            InputStream in = ClassLoader.getSystemResourceAsStream("config.properties");
+            InputStream in = ClassLoader.getSystemResourceAsStream("build.properties");
             prop.load(in);
             String race = prop.getProperty("racedect");
             System.out.println(race);

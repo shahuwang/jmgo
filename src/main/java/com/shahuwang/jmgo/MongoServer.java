@@ -6,11 +6,13 @@ import com.shahuwang.jmgo.utils.SyncChan;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.BsonElement;
+import org.bson.BsonInt32;
+import org.bson.BsonValue;
 
 import java.net.Socket;
 import java.time.Duration;
-import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -32,6 +34,8 @@ public class MongoServer {
     private SyncChan<Boolean> sync;
     private Vector<MongoSocket> unusedSockets = new Vector<>();
     private Vector<MongoSocket> liveSockets = new Vector<>();
+
+    public static final Duration pingDelay = Duration.ofSeconds(15);
 
     Logger logger = LogManager.getLogger(MongoServer.class.getName());
     public MongoServer(ServerAddr addr, SyncChan<Boolean> sync, IDialer dialer){
@@ -182,8 +186,36 @@ public class MongoServer {
     }
 
     protected void pinger(boolean loop){
+        Duration delay;
+        boolean racedetector = BuildConfig.getInstance().getRacedetector();
+        if (racedetector) {
+            synchronized (GlobalMutex.class){
+                delay = this.pingDelay;
+            }
+        }else {
+            delay = this.pingDelay;
+        }
+        BsonElement [] query = {new BsonElement("ping", new BsonInt32(1)),};
+        QueryOp op = new QueryOp.QueryOpBuilder("admin.$cmd", query).flags(QueryOpFlags.FLAG_SLAVE_OK).limit(-1).build();
+        while (true){
+            if (loop) {
+                try {
+                    TimeUnit.SECONDS.sleep(delay.getSeconds());
+                }catch (InterruptedException e){
+                    logger.error(e.getMessage());
+                }
+            }
+            MongoSocket socket;
+            try{
 
-
+                socket = this.acquireSocket(0, delay);
+            }catch (ServerClosedException e){
+                return;
+            }catch (PoolLimitException e){
+                logger.catching(e);
+            }
+            
+        }
     }
 
     public boolean isAbended() {
