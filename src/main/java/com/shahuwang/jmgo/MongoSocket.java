@@ -24,4 +24,8 @@ public class MongoSocket {
     public void close(){
 
     }
+
+    public byte [] SimpleQuery(QueryOp op){
+        return null;
+    }
 }

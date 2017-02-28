@@ -7,7 +7,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.BsonElement;
 import org.bson.BsonInt32;
-import org.bson.BsonValue;
 
 import java.net.Socket;
 import java.time.Duration;
@@ -209,12 +208,35 @@ public class MongoServer {
             try{
 
                 socket = this.acquireSocket(0, delay);
+                long start = System.currentTimeMillis();
+                socket.SimpleQuery(op);
+                long end = System.currentTimeMillis();
+                Duration delay2 = Duration.ofMillis(end - start);
+                this.pingWindow[this.pingIndex] = delay2;
+                this.pingIndex = (this.pingIndex + 1) % this.pingWindow.length;
+                this.pingCount ++;
+                Duration max = Duration.ofSeconds(0) ;
+                for(int i = 0; i < this.pingWindow.length && i < this.pingCount; i++){
+                    if (this.pingWindow[i].compareTo(max) > 0){
+                        max = this.pingWindow[i];
+                    }
+                }
+                socket.release();
+                this.rwlock.writeLock().lock();
+                if (this.closed) {
+                    loop = false;
+                }
+                this.pingValue = max;
+                this.rwlock.writeLock().unlock();
+                logger.info("Ping for {} is {} ms", this.addr.getTcpaddr().getHostString(), max.toMillis());
             }catch (ServerClosedException e){
                 return;
             }catch (PoolLimitException e){
                 logger.catching(e);
             }
-            
+            if (!loop){
+                return;
+            }
         }
     }
 
