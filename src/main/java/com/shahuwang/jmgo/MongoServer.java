@@ -204,10 +204,9 @@ public class MongoServer {
                     logger.error(e.getMessage());
                 }
             }
-            MongoSocket socket;
             try{
 
-                socket = this.acquireSocket(0, delay);
+                MongoSocket socket = this.acquireSocket(0, delay);
                 long start = System.currentTimeMillis();
                 socket.SimpleQuery(op);
                 long end = System.currentTimeMillis();
@@ -242,5 +241,9 @@ public class MongoServer {
 
     public boolean isAbended() {
         return abended;
+    }
+
+    public ServerAddr getAddr() {
+        return addr;
     }
 }
