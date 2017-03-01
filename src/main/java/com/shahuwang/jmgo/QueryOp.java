@@ -1,5 +1,6 @@
 package com.shahuwang.jmgo;
 
+import org.bson.BsonDocument;
 import org.bson.BsonElement;
 
 import java.util.Vector;
@@ -9,10 +10,10 @@ import java.util.Vector;
  */
 public class QueryOp {
     private String collection;
-    private Object query;
+    private BsonDocument query;
     private int skip;
     private int limit;
-    private Object selector;
+    private BsonDocument selector;
     private QueryOpFlags flags;
     private IReply replyFuncs;
     private Mode mode;
@@ -21,8 +22,8 @@ public class QueryOp {
     private Vector<Vector<BsonElement>> serverTags;
 
     private QueryOp(
-            String collection, Object query, int skip, int limit,
-            Object selector, QueryOpFlags flags, IReply replyFuncs,
+            String collection, BsonDocument query, int skip, int limit,
+            BsonDocument selector, QueryOpFlags flags, IReply replyFuncs,
             Mode mode, QueryWrapper options, boolean hasOptions,
             Vector<Vector<BsonElement>> serverTags
     ){
@@ -41,17 +42,17 @@ public class QueryOp {
 
     public static class QueryOpBuilder{
         private String collection;
-        private Object query;
+        private BsonDocument query;
         private int skip;
         private int limit;
-        private Object selector;
+        private BsonDocument selector;
         private QueryOpFlags flags;
         private IReply replyFuncs;
         private Mode mode;
         private QueryWrapper options;
         private boolean hasOptions;
         private Vector<Vector<BsonElement>> serverTags;
-        public QueryOpBuilder(String collection, Object query){
+        public QueryOpBuilder(String collection, BsonDocument query){
             this.collection = collection;
             this.query = query;
         }
@@ -66,7 +67,7 @@ public class QueryOp {
             return this;
         }
 
-        public QueryOpBuilder selector(Object selector){
+        public QueryOpBuilder selector(BsonDocument selector){
             this.selector = selector;
             return this;
         }

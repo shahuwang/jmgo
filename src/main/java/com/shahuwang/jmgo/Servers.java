@@ -1,5 +1,8 @@
 package com.shahuwang.jmgo;
 
+import org.bson.BsonElement;
+
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.Vector;
 
@@ -29,6 +32,66 @@ public class Servers {
             this.slice.remove(server);
         }
         return server;
+    }
+
+    public MongoServer get(int i){
+        return this.slice.get(i);
+    }
+
+    public int len() {
+        return this.slice.size();
+    }
+
+    public boolean empty() {
+        return this.slice.size() == 0;
+    }
+
+    public boolean hasMongos() {
+        for(MongoServer server: this.slice){
+            if (server.getInfo().isMongos()){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public MongoServer bestFit(Mode mode, BsonElement [][] serverTags) {
+        MongoServer best = null;
+        for(MongoServer next: this.slice){
+            if(best == null){
+                best = next;
+                best.getRwlock().readLock().lock();
+                if(serverTags != null && !next.getInfo().isMongos() && !best.hasTags(serverTags)){
+                    best.getRwlock().readLock().unlock();
+                    best = null;
+                }
+                continue;
+            }
+            next.getRwlock().readLock().lock();
+            boolean swap = false;
+            if((serverTags != null && !next.getInfo().isMongos() && !next.hasTags(serverTags))
+                    || (mode == Mode.SECONDARY && next.getInfo().isMaster() && !next.getInfo().isMongos())
+                    || (next.getInfo().isMaster() != best.getInfo().isMaster() && mode != Mode.NEAREST)){
+                swap = (mode == Mode.PRIMARY_PREFERRED) != best.getInfo().isMaster();
+            }
+            if (next.getPingValue().abs().compareTo(Duration.ofMillis(15)) > 0){
+                swap = next.getPingValue().compareTo(best.getPingValue()) < 0;
+            }
+            if (next.getLiveSockets().size() - next.getUnusedSockets().size() < best.getLiveSockets().size() - best.getUnusedSockets().size()){
+                swap = true;
+            }
+            if (swap){
+                best.getRwlock().readLock().unlock();
+                best = next;
+            } else {
+                next.getRwlock().readLock().unlock();
+            }
+        }
+        if (best != null) {
+            // 为什么要做这一步呢
+            best.getRwlock().readLock().unlock();
+        }
+        return best;
     }
 
     class ServerComparator implements Comparator<MongoServer>{

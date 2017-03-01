@@ -5,6 +5,7 @@ import com.shahuwang.jmgo.utils.SyncChan;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.bson.BsonDocument;
 import org.bson.BsonElement;
 import org.bson.BsonInt32;
 
@@ -194,7 +195,7 @@ public class MongoServer {
         }else {
             delay = this.pingDelay;
         }
-        BsonElement [] query = {new BsonElement("ping", new BsonInt32(1)),};
+        BsonDocument query = new BsonDocument("ping", new BsonInt32(1));
         QueryOp op = new QueryOp.QueryOpBuilder("admin.$cmd", query).flags(QueryOpFlags.FLAG_SLAVE_OK).limit(-1).build();
         while (true){
             if (loop) {
@@ -245,5 +246,21 @@ public class MongoServer {
 
     public ServerAddr getAddr() {
         return addr;
+    }
+
+    public ReadWriteLock getRwlock() {
+        return rwlock;
+    }
+
+    public Duration getPingValue() {
+        return pingValue;
+    }
+
+    public Vector<MongoSocket> getUnusedSockets() {
+        return unusedSockets;
+    }
+
+    public Vector<MongoSocket> getLiveSockets() {
+        return liveSockets;
     }
 }
