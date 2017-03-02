@@ -55,8 +55,8 @@ public class Servers {
         return false;
     }
 
-    public Vector<MongoServer> getSlice() {
-        return slice;
+    public MongoServer[] getSlice() {
+        return slice.toArray(new MongoServer[slice.size()]);
     }
 
     public MongoServer bestFit(Mode mode, BsonElement [][] serverTags) {

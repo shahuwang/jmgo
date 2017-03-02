@@ -34,4 +34,8 @@ public class ServerAddr {
     public InetSocketAddress getTcpaddr() {
         return tcpaddr;
     }
+
+    public String toString() {
+        return this.addr_str;
+    }
 }

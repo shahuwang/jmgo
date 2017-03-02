@@ -11,14 +11,7 @@ import java.util.Properties;
  */
 public class Test extends TestCase{
     public void testLoadProperties() {
-        Properties prop = new Properties();
-        try{
-            InputStream in = ClassLoader.getSystemResourceAsStream("build.properties");
-            prop.load(in);
-            String race = prop.getProperty("racedect");
-            System.out.println(race);
-        }catch (IOException e){
-            e.printStackTrace();
-        }
+        ServerAddr addr = new ServerAddr("localhost", 27017);
+        System.out.println(addr.getTcpaddr());
     }
 }
