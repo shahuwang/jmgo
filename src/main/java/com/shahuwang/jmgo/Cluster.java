@@ -91,6 +91,7 @@ public class Cluster {
         return null;
     }
 
+
     private void syncServers(){
         this.sync.offer(true);
     }
@@ -245,5 +246,9 @@ public class Cluster {
         }
         this.rwlock.readLock().unlock();
         return known.toArray(new String[known.size()]);
+    }
+
+    private void syncServerLoop(){
+        
     }
 }
