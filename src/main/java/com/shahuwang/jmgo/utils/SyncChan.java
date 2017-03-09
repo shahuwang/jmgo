@@ -2,6 +2,8 @@ package com.shahuwang.jmgo.utils;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -31,6 +33,24 @@ public class SyncChan<E> {
             return this.queue.take();
         }catch (InterruptedException exception){
             logger.catching(exception);
+            return null;
+        }
+    }
+
+    public E poll() {
+        try{
+            return this.queue.poll(0, TimeUnit.NANOSECONDS);
+        }catch (InterruptedException e){
+            logger.catching(e);
+            return null;
+        }
+    }
+
+    public E pollTimeout(long timeout, TimeUnit unit) {
+        try{
+            return this.queue.poll(timeout, unit);
+        }catch (InterruptedException e){
+            logger.catching(e);
             return null;
         }
     }

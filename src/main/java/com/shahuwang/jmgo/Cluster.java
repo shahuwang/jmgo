@@ -5,12 +5,14 @@ import com.shahuwang.jmgo.exceptions.ReferenceZeroException;
 import com.shahuwang.jmgo.exceptions.SyncServerException;
 import com.shahuwang.jmgo.utils.SyncChan;
 
+import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.*;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
@@ -36,6 +38,8 @@ public class Cluster {
     private IDialer dialer;
 
     protected final static Duration syncSocketTimeout = Duration.ofSeconds(5);
+    protected final static Duration syncShortDelay = Duration.ofMillis(500);
+    protected final static Duration syncServersDelay = Duration.ofSeconds(30);
 
     Logger logger = LogManager.getLogger(Cluster.class.getName());
     public Cluster(String[] userSeeds, boolean direct, boolean failFast, IDialer dialer, String setName){
@@ -48,6 +52,11 @@ public class Cluster {
         this.sync = new SyncChan<>();
         this.serverSynced = this.rwlock.readLock().newCondition();
         Stats.getInstance().setCluster(1);
+        Runnable task = () -> {
+            this.syncServerLoop();
+        };
+        Thread thread = new Thread(task);
+        thread.start();
     }
 
     public void Acquire() {
@@ -86,9 +95,11 @@ public class Cluster {
         return servers;
     }
 
-    public MasterAck isMaster(MongoSocket socket) throws JmgoException{
-        //TODO
-        return null;
+    public void isMaster(MongoSocket socket, MasterAck result) throws JmgoException{
+        MongoSession session = new MongoSession(Mode.MONOTONIC, this, Duration.ofSeconds(10));
+        session.setSocket(socket);
+        session.Run("ismaster", result);
+        session.close();
     }
 
 
@@ -142,7 +153,7 @@ public class Cluster {
                 continue;
             }
             try {
-                result = this.isMaster(socket);
+                this.isMaster(socket, result);
                 socket.release();
             }catch (JmgoException e){
                 socket.release();
@@ -248,7 +259,72 @@ public class Cluster {
         return known.toArray(new String[known.size()]);
     }
 
+
     private void syncServerLoop(){
+        while (true){
+            logger.debug("SYNC cluster {} is starting a sync loop literation", this);
+            this.rwlock.writeLock().lock();
+            if (this.references == 0) {
+                this.rwlock.writeLock().unlock();
+                break;
+            }
+            this.references++;
+            boolean direct = this.direct;
+            this.rwlock.writeLock().unlock();
+            this.syncServersIteration(direct);
+            this.sync.poll();
+            try{
+                this.Release();
+            }catch (ReferenceZeroException e){
+                logger.catching(e);
+            }
+            if (!this.failFast){
+                try{
+                    Thread.sleep(this.syncShortDelay.toMillis());
+                }catch (InterruptedException e){
+                    logger.catching(e);
+                }
+            }
+            this.rwlock.writeLock().lock();
+            if(this.references == 0) {
+                this.rwlock.writeLock().unlock();
+                break;
+            }
+            this.syncCount++;
+            this.serverSynced.notifyAll();
+            boolean restart = !direct && this.masters.empty() || this.servers.empty();
+            this.rwlock.writeLock().unlock();
+            if(restart) {
+                logger.debug("SYNC no masters found. Will synchronize again.");
+                try {
+
+                    Thread.sleep(this.syncShortDelay.toMillis());
+                }catch (InterruptedException e){
+                    logger.catching(e);
+                }
+                continue;
+            }
+
+            logger.debug("SYNC cluster {} waiting for next requested or scheduled sync. ", this);
+            this.sync.pollTimeout(this.syncServersDelay.toMillis(), TimeUnit.MILLISECONDS);
+        }
+        logger.debug("SYNC cluster {} is stopping its sync loop.", this);
+    }
+
+    private MongoServer server(ServerAddr addr){
+        this.rwlock.readLock().lock();
+        MongoServer server= this.servers.search(addr);
+        if (server != null) {
+            return server;
+        }
+        return new MongoServer(addr, this.sync, this.dialer);
+    }
+
+    private SocketAddress resolveAddr(String addr) {
         
+    }
+
+    private void syncServersIteration(boolean direct){
+
     }
 }

@@ -19,7 +19,7 @@ public class MongoSession {
 
     }
 
-    public Object Run(Object cmd){
+    public Object Run(Object cmd, Object result){
         return null;
     }
 
