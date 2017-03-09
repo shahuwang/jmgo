@@ -11,4 +11,12 @@ public class TopologyInfo {
         this.info = info;
         this.hosts = hosts;
     }
+
+    public ServerInfo getInfo() {
+        return info;
+    }
+
+    public String[] getHosts() {
+        return hosts;
+    }
 }

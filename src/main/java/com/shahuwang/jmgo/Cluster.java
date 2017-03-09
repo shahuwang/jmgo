@@ -5,7 +5,6 @@ import com.shahuwang.jmgo.exceptions.ReferenceZeroException;
 import com.shahuwang.jmgo.exceptions.SyncServerException;
 import com.shahuwang.jmgo.utils.SyncChan;
 
-import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.*;
 
@@ -14,16 +13,20 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.ObjDoubleConsumer;
+
 
 /**
  * Created by rickey on 2017/3/2.
  */
 public class Cluster {
     private ReentrantReadWriteLock rwlock = new ReentrantReadWriteLock();
-    private String[] userSeeds;
-    private String[] dynaSeeds;
+    private ServerAddr[] userSeeds;
+    private ServerAddr[] dynaSeeds;
     private Servers servers;
     private Servers masters;
     private int references;
@@ -40,9 +43,11 @@ public class Cluster {
     protected final static Duration syncSocketTimeout = Duration.ofSeconds(5);
     protected final static Duration syncShortDelay = Duration.ofMillis(500);
     protected final static Duration syncServersDelay = Duration.ofSeconds(30);
+    protected final static boolean partialSync = true;
+    protected final static boolean completeSync = true;
 
     Logger logger = LogManager.getLogger(Cluster.class.getName());
-    public Cluster(String[] userSeeds, boolean direct, boolean failFast, IDialer dialer, String setName){
+    public Cluster(ServerAddr[] userSeeds, boolean direct, boolean failFast, IDialer dialer, String setName){
         this.userSeeds = userSeeds;
         this.references = 1;
         this.direct = direct;
@@ -235,28 +240,28 @@ public class Cluster {
         this.rwlock.writeLock().unlock();
     }
 
-    private String[] getKnowAddrs(){
+    private ServerAddr[] getKnowAddrs(){
         this.rwlock.readLock().lock();
         int max = this.userSeeds.length + this.dynaSeeds.length + this.servers.len();
-        Map<String, Boolean> seen = new HashMap<>(max);
-        Vector<String> known = new Vector<>(max);
-        Consumer<String> add = (String addr) -> {
+        Map<ServerAddr, Boolean> seen = new HashMap<>(max);
+        Vector<ServerAddr> known = new Vector<>(max);
+        Consumer<ServerAddr> add = (ServerAddr addr) -> {
           if(!seen.containsKey(addr)){
               seen.put(addr, true);
               known.add(addr);
           }
         };
-        for(String addr: this.userSeeds){
+        for(ServerAddr addr: this.userSeeds){
             add.accept(addr);
         }
-        for(String addr: this.dynaSeeds){
+        for(ServerAddr addr: this.dynaSeeds){
             add.accept(addr);
         }
         for(MongoServer serv: this.servers.getSlice()){
-            add.accept(serv.getAddr().toString());
+            add.accept(serv.getAddr());
         }
         this.rwlock.readLock().unlock();
-        return known.toArray(new String[known.size()]);
+        return known.toArray(new ServerAddr[known.size()]);
     }
 
 
@@ -320,11 +325,59 @@ public class Cluster {
         return new MongoServer(addr, this.sync, this.dialer);
     }
 
-    private SocketAddress resolveAddr(String addr) {
-        
+    private void syncServersIteration(boolean direct){
+        logger.info("SYNC starting full topology synchronization");
+        Map<ServerAddr, PendingAdd> notYetAdd = new HashMap<>();
+        Map<ServerAddr, Boolean>addIfFound = new HashMap<>();
+        Map<ServerAddr, Boolean>seen = new HashMap<>();
+        boolean syncKind = partialSync;
+        ReentrantLock lock = new ReentrantLock();
+        BiConsumer<ServerAddr, Boolean> spawnSync = (ServerAddr addr, Boolean byMaster) -> {
+            lock.lock();
+            if(byMaster) {
+                PendingAdd pending = notYetAdd.get(addr);
+                if(pending != null) {
+                    notYetAdd.remove(addr);
+                    lock.unlock();
+                    try{
+                        this.addServer(pending.server, pending.info, completeSync);
+                    }catch (JmgoException e){
+                        logger.catching(e);
+                        return;
+                    }
+                }
+                addIfFound.put(addr, new Boolean(true));
+            }
+            if(seen.get(addr)) {
+                lock.unlock();
+                return;
+            }
+            seen.put(addr, true);
+            lock.unlock();
+            MongoServer server = this.server(addr);
+            TopologyInfo tpinfo;
+            try{
+                tpinfo = this.syncServer(server);
+            }catch (SyncServerException e){
+                this.removeServer(server);
+                return;
+            }
+            lock.lock();
+            boolean add = direct || tpinfo.getInfo().isMaster() || addIfFound.containsKey(addr);
+            if (add) {
+                syncKind = completeSync;
+            } else{
+                
+            }
+        };
     }
 
-    private void syncServersIteration(boolean direct){
-
+    class PendingAdd{
+        protected MongoServer server;
+        protected ServerInfo info;
+        public PendingAdd(MongoServer server, ServerInfo info){
+            this.server = server;
+            this.info = info;
+        }
     }
 }
