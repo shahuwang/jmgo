@@ -8,9 +8,9 @@ import org.bson.BsonElement;
 public class MasterAck {
     private boolean isMaster;
     private boolean secondary;
-    private String primary;
-    private String[] hosts;
-    private String[] passives;
+    private ServerAddr primary;
+    private ServerAddr[] hosts;
+    private ServerAddr[] passives;
     private BsonElement[][]Tags;
     private String setName;
     private String msg;
@@ -24,15 +24,15 @@ public class MasterAck {
         return secondary;
     }
 
-    public String getPrimary() {
+    public ServerAddr getPrimary() {
         return primary;
     }
 
-    public String[] getHosts() {
+    public ServerAddr[] getHosts() {
         return hosts;
     }
 
-    public String[] getPassives() {
+    public ServerAddr[] getPassives() {
         return passives;
     }
 

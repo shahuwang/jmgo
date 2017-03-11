@@ -11,13 +11,14 @@ import java.util.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.ObjDoubleConsumer;
 
 
 /**
@@ -112,7 +113,7 @@ public class Cluster {
         this.sync.offer(true);
     }
 
-    private void removeServer(MongoServer server){
+    protected void removeServer(MongoServer server){
         this.rwlock.writeLock().lock();
         this.masters.remove(server);
         MongoServer other = this.servers.remove(server);
@@ -125,7 +126,7 @@ public class Cluster {
     }
 
 
-    private TopologyInfo syncServer(MongoServer server) throws SyncServerException{
+    protected TopologyInfo syncServer(MongoServer server) throws SyncServerException{
         Duration syncTimeout = null;
         if (BuildConfig.getInstance().getRacedetector()){
             synchronized (GlobalMutex.class){
@@ -187,26 +188,26 @@ public class Cluster {
             throw new SyncServerException(String.format("SYNC %s is not a master nor slave", addr.getTcpaddr().toString()));
         }
         ServerInfo info = new ServerInfo(result.isMaster(), result.getMsg() == "isdbgrid", result.getTags(), result.getSetName(), result.getMaxWireVersion());
-        List<String> hosts = new ArrayList<>();
-        if (result.getPrimary() != "") {
+        List<ServerAddr> hosts = new ArrayList<>();
+        if (result.getPrimary() != null) {
             hosts.add(result.getPrimary());
         }
-        for(String h: result.getHosts()){
+        for(ServerAddr h: result.getHosts()){
             hosts.add(h);
         }
-        for(String p: result.getPassives()){
+        for(ServerAddr p: result.getPassives()){
             hosts.add(p);
         }
 
         logger.info("SYNC {} knows about the following peers: {}", addr.getTcpaddr().toString(), hosts);
-        return new TopologyInfo(info, hosts.toArray(new String[hosts.size()]));
+        return new TopologyInfo(info, hosts.toArray(new ServerAddr[hosts.size()]));
     }
 
-    private void addServer(MongoServer server, ServerInfo info, boolean syncKind)throws JmgoException{
+    protected void addServer(MongoServer server, ServerInfo info, SyncKind syncKind)throws JmgoException{
         this.rwlock.writeLock().lock();
         MongoServer current = this.servers.search(server.getAddr());
         if(current == null){
-            if(!syncKind){
+            if(syncKind == SyncKind.PARTIAL_SYNC){
                 //partialSync
                 this.rwlock.writeLock().unlock();
                 server.close();
@@ -316,7 +317,7 @@ public class Cluster {
         logger.debug("SYNC cluster {} is stopping its sync loop.", this);
     }
 
-    private MongoServer server(ServerAddr addr){
+    protected MongoServer server(ServerAddr addr){
         this.rwlock.readLock().lock();
         MongoServer server= this.servers.search(addr);
         if (server != null) {
@@ -327,57 +328,46 @@ public class Cluster {
 
     private void syncServersIteration(boolean direct){
         logger.info("SYNC starting full topology synchronization");
-        Map<ServerAddr, PendingAdd> notYetAdd = new HashMap<>();
-        Map<ServerAddr, Boolean>addIfFound = new HashMap<>();
-        Map<ServerAddr, Boolean>seen = new HashMap<>();
-        boolean syncKind = partialSync;
-        ReentrantLock lock = new ReentrantLock();
-        BiConsumer<ServerAddr, Boolean> spawnSync = (ServerAddr addr, Boolean byMaster) -> {
-            lock.lock();
-            if(byMaster) {
-                PendingAdd pending = notYetAdd.get(addr);
-                if(pending != null) {
-                    notYetAdd.remove(addr);
-                    lock.unlock();
-                    try{
-                        this.addServer(pending.server, pending.info, completeSync);
-                    }catch (JmgoException e){
-                        logger.catching(e);
-                        return;
-                    }
+        ServerAddr[] knownAddr = this.getKnowAddrs();
+        Phaser phaser = new Phaser();
+        for(ServerAddr addr: knownAddr){
+            Thread thread = new Thread(new SpawnSync(this, addr, false, direct, phaser));
+            thread.start();
+        }
+        try {
+            phaser.wait();
+        }catch (InterruptedException e){
+            logger.catching(e);
+        }
+        if (SpawnSync.syncKind == SyncKind.COMPLETE_SYNC) {
+            logger.info("SYNC synchronization was complte (got data from primary)");
+            for(PendingAdd pending: SpawnSync.notYetAdd.values()){
+                this.removeServer(pending.server);
+            }
+        }else{
+            logger.info("SYNC Synchronization was partial (cannot talk to primary).");
+            for(PendingAdd pending: SpawnSync.notYetAdd.values()){
+                try {
+                    this.addServer(pending.server, pending.info, SyncKind.PARTIAL_SYNC);
+                }catch (JmgoException e){
+                    logger.catching(e);
                 }
-                addIfFound.put(addr, new Boolean(true));
             }
-            if(seen.get(addr)) {
-                lock.unlock();
-                return;
+        }
+        this.rwlock.writeLock().lock();
+        int masterlen = this.masters.len();
+        logger.info("SYNC synchronization completed: {} master(s) and {} slave(s) alive", masterlen, this.servers.len() - masterlen);
+        if(SpawnSync.syncKind == SyncKind.COMPLETE_SYNC) {
+            ServerAddr[] dynaSeeds = new ServerAddr[this.servers.len()];
+            int i = 0;
+            for(MongoServer server: this.servers.getSlice()){
+                dynaSeeds[i] = server.getAddr();
+                i++;
             }
-            seen.put(addr, true);
-            lock.unlock();
-            MongoServer server = this.server(addr);
-            TopologyInfo tpinfo;
-            try{
-                tpinfo = this.syncServer(server);
-            }catch (SyncServerException e){
-                this.removeServer(server);
-                return;
-            }
-            lock.lock();
-            boolean add = direct || tpinfo.getInfo().isMaster() || addIfFound.containsKey(addr);
-            if (add) {
-                syncKind = completeSync;
-            } else{
-                
-            }
-        };
+            this.dynaSeeds = dynaSeeds;
+            logger.debug("SYNC new dynamic seeds: {}", dynaSeeds);
+        }
+        this.rwlock.writeLock().unlock();
     }
 
-    class PendingAdd{
-        protected MongoServer server;
-        protected ServerInfo info;
-        public PendingAdd(MongoServer server, ServerInfo info){
-            this.server = server;
-            this.info = info;
-        }
-    }
 }

@@ -5,9 +5,9 @@ package com.shahuwang.jmgo;
  */
 public class TopologyInfo {
     private ServerInfo info;
-    private String[] hosts;
+    private ServerAddr[] hosts;
 
-    public TopologyInfo(ServerInfo info, String[] hosts){
+    public TopologyInfo(ServerInfo info, ServerAddr[] hosts){
         this.info = info;
         this.hosts = hosts;
     }
@@ -16,7 +16,7 @@ public class TopologyInfo {
         return info;
     }
 
-    public String[] getHosts() {
+    public ServerAddr[] getHosts() {
         return hosts;
     }
 }
