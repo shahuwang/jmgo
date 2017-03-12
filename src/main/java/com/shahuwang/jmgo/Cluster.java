@@ -1,23 +1,23 @@
 package com.shahuwang.jmgo;
 
 import com.shahuwang.jmgo.exceptions.JmgoException;
+import com.shahuwang.jmgo.exceptions.NoReachableServerException;
 import com.shahuwang.jmgo.exceptions.ReferenceZeroException;
 import com.shahuwang.jmgo.exceptions.SyncServerException;
 import com.shahuwang.jmgo.utils.SyncChan;
 
 import java.time.Duration;
+
 import java.util.*;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.bson.BsonElement;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 
@@ -88,6 +88,59 @@ public class Cluster {
             Stats.getInstance().setCluster(-1);
         }
         this.rwlock.writeLock().unlock();
+    }
+
+    public MongoSocket acquireSocket(Mode mode, boolean slaveOk, Duration syncTimeout
+            , Duration socketTimeout, BsonElement[][]serverTags, int poolLimit)throws NoReachableServerException{
+        Duration started = Duration.ZERO;
+        int syncCount = 0;
+        boolean warnedLimit = false;
+        while (true) {
+            this.rwlock.readLock().lock();
+            while (true) {
+                int masterLen = this.masters.len();
+                int slaveLen = this.servers.len() - masterLen;
+                logger.debug("Cluster has {} known masters and {} known slaves", masterLen, slaveLen);
+                if (masterLen > 0 && !(slaveOk && mode == Mode.SECONDARY) || slaveLen > 0 && slaveOk){
+                    break;
+                }
+                if (masterLen > 0 && mode == Mode.SECONDARY && this.masters.hasMongos()) {
+                    break;
+                }
+                if (started.isZero()) {
+                    started = Duration.ofMillis(System.currentTimeMillis());
+                    syncCount = this.syncCount;
+                } else if (!syncTimeout.isZero() && started.getSeconds() * 1000 < (System.currentTimeMillis() - syncCount) || this.failFast && this.syncCount != syncCount){
+                    this.rwlock.readLock().unlock();
+                    throw new NoReachableServerException();
+                }
+                logger.info("Waiting for servers to synchronize...");
+                this.syncServers();
+                try {
+
+                    this.serverSynced.wait();
+                }catch (InterruptedException e){
+                    logger.catching(e);
+                }
+            }
+
+            MongoServer server = null;
+            if(slaveOk) {
+                server = this.servers.bestFit(mode, serverTags);
+            } else {
+                server = this.masters.bestFit(mode, serverTags);
+            }
+            this.rwlock.readLock().unlock();
+            if (server == null) {
+                try {
+                    Thread.sleep(10000);
+                }catch (InterruptedException e){
+                    logger.catching(e);
+                }
+                continue;
+            }
+            //server.acquireSocket();
+        }
     }
 
     public ServerAddr[] liveServers() {

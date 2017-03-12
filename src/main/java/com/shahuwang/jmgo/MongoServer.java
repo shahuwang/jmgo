@@ -28,7 +28,7 @@ public class MongoServer {
     private Duration pingValue;
     private int pingIndex;
     private int pingCount;
-    private ServerInfo serverInfo = new ServerInfo();
+    private ServerInfo serverInfo ;
     private Duration [] pingWindow = new Duration[6];
     // 主要用来通知cluster，此server已经挂掉了
     private SyncChan<Boolean> sync;
@@ -166,22 +166,22 @@ public class MongoServer {
     }
 
     protected boolean hasTags(BsonElement [][] serverTags){
-        nextTagSet:
-        for(BsonElement [] tags: serverTags){
-            nextReqTag:
-            for(BsonElement req: tags){
-                for(BsonElement has: this.serverInfo.getTags()){
-                    if (req.getName() == has.getName()){
-                        if (req.getValue() == has.getValue()){
-                            continue nextReqTag;
-                        }
-                        continue nextTagSet;
-                    }
-                }
-                continue nextTagSet;
-            }
-            return true;
-        }
+//        nextTagSet:
+//        for(BsonElement [] tags: serverTags){
+//            nextReqTag:
+//            for(BsonElement req: tags){
+//                for(BsonElement has: this.serverInfo.getTags()){
+//                    if (req.getName() == has.getName()){
+//                        if (req.getValue() == has.getValue()){
+//                            continue nextReqTag;
+//                        }
+//                        continue nextTagSet;
+//                    }
+//                }
+//                continue nextTagSet;
+//            }
+//            return true;
+//        }
         return false;
     }
 
