@@ -28,4 +28,8 @@ public class MongoSocket {
     public byte [] SimpleQuery(QueryOp op){
         return null;
     }
+
+    public void setTimeout(Duration timeout){
+
+    }
 }
