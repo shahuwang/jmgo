@@ -20,6 +20,12 @@ public class Credential {
         this.mechanism = mechanism;
     }
 
+    public Credential clone() {
+        return new Credential(
+                this.username, this.password, this.source, this.service, this.serviceHost, this.mechanism
+        );
+    }
+
     public String getUsername() {
         return username;
     }

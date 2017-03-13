@@ -32,4 +32,8 @@ public class MongoSocket {
     public void setTimeout(Duration timeout){
 
     }
+
+    public ServerInfo acquire() {
+        return null;
+    }
 }

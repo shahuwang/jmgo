@@ -1,6 +1,9 @@
 package com.shahuwang.jmgo;
 
 import com.shahuwang.jmgo.exceptions.JmgoException;
+import com.shahuwang.jmgo.exceptions.MasterSocketReservedException;
+import com.shahuwang.jmgo.exceptions.SessionClosedException;
+import com.shahuwang.jmgo.exceptions.SlaveSocketReservedException;
 
 import java.time.Duration;
 
@@ -43,12 +46,35 @@ public class MongoSession {
         dialWithInfo(info);
     }
 
-    protected MongoSession(Mode consistency, Cluster mcluster, Duration timeout){
-
+    public void setSocket(MongoSocket socket)throws MasterSocketReservedException, SlaveSocketReservedException{
+        // cluster在判断isMaster需要创建一个session，执行ismaster命令，此时没有dial的过程（也不需要，cluster本身已经维持了一组socket）
+        // 所以此处用于绑定；info本身包含了master信息，但是可能会由于服务器变动，已经变了
+        ServerInfo info = socket.acquire();
+        if (info.isMaster()){
+            if (this.masterSocket != null) {
+                throw new MasterSocketReservedException();
+            }
+            this.masterSocket = socket;
+        } else {
+            if (this.slaveSocket != null) {
+                throw new SlaveSocketReservedException();
+            }
+            this.slaveSocket = socket;
+        }
     }
 
-    public void setSocket(MongoSocket socket){
-
+    public void unsetSocket() {
+        //close session 的时候使用了
+        //另外在setMode(数据一致性策略）的时候使用了
+        if (this.masterSocket != null) {
+            // 减少该socket的reference数量，当数量为0的时候关闭此socket
+            this.masterSocket.release();
+        }
+        if (this.slaveSocket != null) {
+            this.slaveSocket.release();
+        }
+        this.slaveSocket = null;
+        this.masterSocket = null;
     }
 
     public void close(){
@@ -87,6 +113,29 @@ public class MongoSession {
 
     public void setSafe(Safe safe){
 
+    }
+
+    public Cluster cluster() throws SessionClosedException{
+        if (this.cluster_ == null) {
+            throw new SessionClosedException();
+        }
+        return this.cluster_;
+    }
+
+    public MongoSocket getMasterSocket() {
+        return masterSocket;
+    }
+
+    public MongoSocket getSlaveSocket() {
+        return slaveSocket;
+    }
+
+    public Vector<Credential> getCreds() {
+        return creds;
+    }
+
+    public Credential getDialCred() {
+        return dialCred;
     }
 
     private MongoSession dialWithInfo(DialInfo info)throws JmgoException {

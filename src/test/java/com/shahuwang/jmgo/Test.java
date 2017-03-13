@@ -13,5 +13,13 @@ public class Test extends TestCase{
     public void testLoadProperties() {
         ServerAddr addr = new ServerAddr("localhost", 27017);
         System.out.println(addr.getTcpaddr());
+
+    }
+
+    class TestCopy{
+        public String name;
+        public TestCopy(String name){
+            this.name = name;
+        }
     }
 }
