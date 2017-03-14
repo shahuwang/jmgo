@@ -19,13 +19,13 @@ public class QueryOp {
     private Mode mode;
     private QueryWrapper options;
     private boolean hasOptions;
-    private Vector<Vector<BsonElement>> serverTags;
+    private Vector<BsonElement> serverTags;
 
     private QueryOp(
             String collection, BsonDocument query, int skip, int limit,
             BsonDocument selector, QueryOpFlags flags, IReply replyFuncs,
             Mode mode, QueryWrapper options, boolean hasOptions,
-            Vector<Vector<BsonElement>> serverTags
+            Vector<BsonElement> serverTags
     ){
         this.collection = collection;
         this.query = query;
@@ -40,6 +40,10 @@ public class QueryOp {
         this.serverTags = serverTags;
     }
 
+    public Vector<BsonElement> getServerTags() {
+        return serverTags;
+    }
+
     public static class QueryOpBuilder{
         private String collection;
         private BsonDocument query;
@@ -51,7 +55,7 @@ public class QueryOp {
         private Mode mode;
         private QueryWrapper options;
         private boolean hasOptions;
-        private Vector<Vector<BsonElement>> serverTags;
+        private Vector<BsonElement> serverTags;
         public QueryOpBuilder(String collection, BsonDocument query){
             this.collection = collection;
             this.query = query;
@@ -97,7 +101,7 @@ public class QueryOp {
             return  this;
         }
 
-        public  QueryOpBuilder serverTags(Vector<Vector<BsonElement>> serverTags){
+        public  QueryOpBuilder serverTags(Vector<BsonElement> serverTags){
             this.serverTags = this.serverTags;
             return this;
         }

@@ -59,7 +59,7 @@ public class Servers {
         return slice.toArray(new MongoServer[slice.size()]);
     }
 
-    public MongoServer bestFit(Mode mode, BsonElement [][] serverTags) {
+    public MongoServer bestFit(Mode mode, BsonElement[] serverTags) {
         MongoServer best = null;
         for(MongoServer next: this.slice){
             if(best == null){

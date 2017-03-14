@@ -1,9 +1,9 @@
 package com.shahuwang.jmgo;
 
-import com.shahuwang.jmgo.exceptions.JmgoException;
-import com.shahuwang.jmgo.exceptions.MasterSocketReservedException;
-import com.shahuwang.jmgo.exceptions.SessionClosedException;
-import com.shahuwang.jmgo.exceptions.SlaveSocketReservedException;
+import com.shahuwang.jmgo.exceptions.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.bson.BsonElement;
 
 import java.time.Duration;
 
@@ -28,9 +28,12 @@ public class MongoSession {
     private Duration syncTimeout;
     private Duration sockTimeout;
     private QueryConfig queryConfig;
+    private QueryOp safeOp;
+    private boolean bypassValidation;
 
     private final float defaultPrefetch = 0.25f;
     private final int maxUpsertRetries = 5;
+    Logger logger = LogManager.getLogger(MongoSession.class.getName());
 
     public MongoSession(String url) throws JmgoException{
         DialInfo info = new DialInfo(url);
@@ -45,6 +48,11 @@ public class MongoSession {
         info.setTimeout(timeout);
         dialWithInfo(info);
     }
+
+    public MongoSession(){
+
+    }
+
 
     public void setSocket(MongoSocket socket)throws MasterSocketReservedException, SlaveSocketReservedException{
         // cluster在判断isMaster需要创建一个session，执行ismaster命令，此时没有dial的过程（也不需要，cluster本身已经维持了一组socket）
@@ -77,6 +85,58 @@ public class MongoSession {
         this.masterSocket = null;
     }
 
+    public ServerAddr[] liveServer() {
+        // 返回当前仍存活的服务器地址
+        this.m.readLock().lock();
+        ServerAddr[] addr = null;
+        try {
+         addr = this.cluster().liveServers();
+        }catch (JmgoException e){
+            logger.catching(e);
+        }
+        this.m.readLock().unlock();
+        return addr;
+    }
+
+    public Database DB(String name) {
+        if(name == ""){
+            name = this.defaultdb;
+        }
+        return new Database(this, name);
+    }
+
+    public void login(Credential cred)throws SessionClosedException, NoReachableServerException {
+        MongoSocket socket = this.acquireSocket(true);
+
+        Credential credCopy = cred.clone();
+        if(cred.getSource() == ""){
+            //MongoDB Enterprise supports authentication using a Kerberos service
+            if (cred.getMechanism() == "GASSAPI") {
+                credCopy.setSource("$external");
+            } else {
+                credCopy.setSource(this.sourcedb);
+            }
+        }
+        socket.login(credCopy);
+        this.m.writeLock().lock();
+        this.creds.add(credCopy);
+        this.m.writeLock().unlock();
+    }
+
+    public void logoutAll() {
+        this.m.writeLock().lock();
+        for(Credential c: this.creds){
+            if(this.masterSocket != null) {
+                this.masterSocket.logout(c.getSource());
+            }
+            if(this.slaveSocket != null){
+                this.slaveSocket.logout(c.getSource());
+            }
+        }
+        this.creds.clear();
+        this.m.writeLock().unlock();
+    }
+
     public void close(){
 
     }
@@ -88,6 +148,8 @@ public class MongoSession {
     public void setMode(Mode mode, boolean refresh){
 
     }
+
+
 
     public void setSyncTimeout(Duration timeout) {
         this.m.writeLock().lock();
@@ -113,6 +175,10 @@ public class MongoSession {
 
     public void setSafe(Safe safe){
 
+    }
+
+    public Duration getSockTimeout() {
+        return sockTimeout;
     }
 
     public Cluster cluster() throws SessionClosedException{
@@ -189,6 +255,123 @@ public class MongoSession {
         }
         this.setMode(Mode.STRONG, true);
         return this;
+    }
+
+    private MongoSession copySession(boolean keeyCreds) {
+        this.cluster_.Acquire();
+        if(this.masterSocket != null) {
+            this.masterSocket.acquire();
+        }
+        if(this.slaveSocket != null) {
+            this.slaveSocket.acquire();
+        }
+        Vector<Credential> creds = new Vector<>();
+        if(keeyCreds) {
+            for (Credential c : this.creds) {
+                creds.add(c.clone());
+            }
+        }else if(this.dialCred != null){
+            creds.add(this.dialCred.clone());
+        }
+        MongoSession s = new MongoSession();
+        s.m = new ReentrantReadWriteLock();
+        s.cluster_ = this.cluster_;
+        s.slaveSocket = this.slaveSocket;
+        s.masterSocket = this.masterSocket;
+        s.slaveOk = this.slaveOk;
+        s.consistency = this.consistency;
+        s.queryConfig = this.queryConfig.clone();
+        s.safeOp = this.safeOp;
+        s.syncTimeout = this.syncTimeout;
+        s.sockTimeout = this.sockTimeout;
+        s.defaultdb = this.defaultdb;
+        s.sourcedb = this.sourcedb;
+        s.dialCred = this.dialCred;
+        s.creds = creds;
+        s.poolLimit = this.poolLimit;
+        s.bypassValidation = this.bypassValidation;
+        return s;
+    }
+
+    protected MongoSocket acquireSocket(boolean slaveOk)throws SessionClosedException, NoReachableServerException {
+        this.m.readLock().lock();
+        //如果slaveSocket可用，能用，而且masterSocket不可用或者consistency不会生成masterSocket的
+        if(this.slaveSocket != null
+                && this.slaveOk && slaveOk &&
+                (this.masterSocket == null ||
+                        this.consistency != Mode.PRIMARY_PREFERRED &&
+                        this.consistency != Mode.MONOTONIC)){
+            MongoSocket socket = this.slaveSocket;
+            this.m.readLock().unlock();
+            return socket;
+        }
+        if(this.masterSocket != null){
+            MongoSocket socket = this.masterSocket;
+            socket.acquire();
+            this.m.readLock().unlock();
+            return socket;
+        }
+        this.m.readLock().unlock();
+
+        // 还是没有拿到合适的，用更强的锁再试多一次，但是不理解这个原因
+        this.m.writeLock().lock();
+
+        if(this.slaveSocket != null
+                && this.slaveOk && slaveOk &&
+                (this.masterSocket == null ||
+                        this.consistency != Mode.PRIMARY_PREFERRED &&
+                                this.consistency != Mode.MONOTONIC)){
+            MongoSocket socket = this.slaveSocket;
+            this.m.writeLock().unlock();
+            return socket;
+        }
+        if(this.masterSocket != null){
+            MongoSocket socket = this.masterSocket;
+            socket.acquire();
+            this.m.writeLock().unlock();
+            return socket;
+        }
+
+        // 还是没拿到合适的，创建一个新的
+        Vector<BsonElement> tags = this.queryConfig.getOp().getServerTags();
+        MongoSocket socket = null;
+        try {
+            socket = this.cluster().acquireSocket(
+                    this.consistency, this.slaveOk && this.slaveOk,
+                    this.syncTimeout, this.sockTimeout, tags.toArray(new BsonElement[tags.size()]), this.poolLimit);
+        }catch (SessionClosedException e){
+            this.m.writeLock().unlock();
+            throw new SessionClosedException();
+        }catch (NoReachableServerException e){
+            this.m.writeLock().unlock();
+            throw new NoReachableServerException();
+        }
+        try{
+            this.socketLogin(socket);
+        }catch (Exception e){
+            socket.release();
+            this.m.writeLock().unlock();
+            throw e;
+        }
+
+        if(this.consistency != Mode.EVENTULA || this.slaveSocket != null){
+            try {
+                this.setSocket(socket);
+            }catch (SlaveSocketReservedException  e){
+                logger.catching(e);
+            }catch (MasterSocketReservedException e){
+                logger.catching(e);
+            }
+        }
+        if (!slaveOk && this.consistency == Mode.MONOTONIC){
+            this.slaveOk = false;
+        }
+        this.m.writeLock().unlock();
+        return socket;
+    }
+
+    private void socketLogin(MongoSocket socket) {
+        //TODO
     }
 
     class Dialer implements IDialer{};

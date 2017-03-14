@@ -91,7 +91,7 @@ public class Cluster {
     }
 
     public MongoSocket acquireSocket(Mode mode, boolean slaveOk, Duration syncTimeout
-            , Duration socketTimeout, BsonElement[][]serverTags, int poolLimit)throws NoReachableServerException{
+            , Duration socketTimeout, BsonElement[]serverTags, int poolLimit)throws NoReachableServerException{
         Duration started = Duration.ZERO;
         int syncCount = 0;
         boolean warnedLimit = false;
@@ -155,10 +155,10 @@ public class Cluster {
     }
 
     public void isMaster(MongoSocket socket, MasterAck result) throws JmgoException{
-        MongoSession session = new MongoSession(Mode.MONOTONIC, this, Duration.ofSeconds(10));
-        session.setSocket(socket);
-        session.Run("ismaster", result);
-        session.close();
+//        MongoSession session = new MongoSession(Mode.MONOTONIC, this, Duration.ofSeconds(10));
+//        session.setSocket(socket);
+//        session.Run("ismaster", result);
+//        session.close();
     }
 
 

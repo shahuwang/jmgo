@@ -165,7 +165,7 @@ public class MongoServer {
         return info;
     }
 
-    protected boolean hasTags(BsonElement [][] serverTags){
+    protected boolean hasTags(BsonElement [] serverTags){
 //        nextTagSet:
 //        for(BsonElement [] tags: serverTags){
 //            nextReqTag:

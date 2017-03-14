@@ -38,6 +38,10 @@ public class Credential {
         return source;
     }
 
+    public void setSource(String source) {
+        this.source = source;
+    }
+
     public String getService() {
         return service;
     }

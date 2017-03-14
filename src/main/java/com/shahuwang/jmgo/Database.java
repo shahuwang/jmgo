@@ -16,6 +16,9 @@ public class Database {
         return session;
     }
 
+    public Collection C(String name) {
+        return new Collection(this, name, this.name + "." + name);
+    }
     public String getName() {
         return name;
     }

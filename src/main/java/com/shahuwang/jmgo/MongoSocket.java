@@ -33,6 +33,14 @@ public class MongoSocket {
 
     }
 
+    public void login(Credential cred) {
+
+    }
+
+    public void logout(String source){
+
+    }
+
     public ServerInfo acquire() {
         return null;
     }
