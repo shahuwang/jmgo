@@ -204,6 +204,18 @@ public class MongoSession {
         return dialCred;
     }
 
+    public ReentrantReadWriteLock getM() {
+        return m;
+    }
+
+    public QueryOp getSafeOp() {
+        return safeOp;
+    }
+
+    public boolean isBypassValidation() {
+        return bypassValidation;
+    }
+
     private MongoSession dialWithInfo(DialInfo info)throws JmgoException {
         ServerAddr[] addrs = new ServerAddr[info.getAddrs().length];
         String [] addrInfo = info.getAddrs();

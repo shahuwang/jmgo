@@ -9,6 +9,7 @@ import java.time.Duration;
  * Created by rickey on 2017/2/23.
  */
 public class MongoSocket {
+    private ServerInfo serverInfo;
     public MongoSocket(MongoServer server, Socket conn, Duration timeout){
 
     }
@@ -39,6 +40,10 @@ public class MongoSocket {
 
     public void logout(String source){
 
+    }
+
+    public ServerInfo getServerInfo() {
+        return serverInfo;
     }
 
     public ServerInfo acquire() {

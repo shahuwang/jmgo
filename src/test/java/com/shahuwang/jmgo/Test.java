@@ -19,6 +19,13 @@ public class Test extends TestCase{
         tp.tpname = "tpname++++";
         System.out.println(tp2.t.name);
         System.out.println(tp2.tpname);
+        testGeneric(tp);
+    }
+
+    private <T>void testGeneric(T t){
+      if(t instanceof TestCopy){
+          System.out.println("=======");
+      }
     }
 
     class TestCopy{

@@ -14,10 +14,10 @@ public class ServerInfo {
     private boolean mongos = false;
     private int maxWireVersion = 0;
     private String setName = "";
-    private BsonElement[][] tags;
+    private BsonElement[] tags;
 
 
-    public ServerInfo(boolean master, boolean mongos, BsonElement[][] tags, String setName, int maxWireVersion){
+    public ServerInfo(boolean master, boolean mongos, BsonElement[] tags, String setName, int maxWireVersion){
         this.master = master;
         this.mongos = mongos;
         this.tags = tags;
@@ -41,7 +41,11 @@ public class ServerInfo {
         this.mongos = mongos;
     }
 
-    public BsonElement[][] getTags() {
+    public int getMaxWireVersion() {
+        return maxWireVersion;
+    }
+
+    public BsonElement[] getTags() {
         return tags;
     }
 }
