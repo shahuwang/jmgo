@@ -5,7 +5,7 @@ import com.shahuwang.jmgo.exceptions.NoReachableServerException;
 import com.shahuwang.jmgo.exceptions.SessionClosedException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.bson.BsonDocument;
+import org.bson.*;
 
 import java.util.List;
 
@@ -58,7 +58,7 @@ public class Collection {
         boolean bypassValidation = session.isBypassValidation();
         session.getM().readLock().unlock();
         if(socket.getServerInfo().getMaxWireVersion() >= 2) {
-            if(op instanceof InsertOp && ((InsertOp) op).getDocuments().length > 1000){
+            if(op instanceof InsertOp && ((InsertOp) op).getDocuments().size() > 1000){
                 List<BsonDocument> all = ((InsertOp) op).getDocuments();
                 for(int i = 0; i<all.size(); i+=1000){
                     int l = i + 1000;
@@ -73,6 +73,23 @@ public class Collection {
     }
 
     private <T> void writeOpCommand(MongoSocket socket, QueryOp safaop, T op, boolean ordered, boolean bypasssValidation){
-        
+        BsonDocument writeConcern = null;
+        if(safaop == null){
+            writeConcern = new BsonDocument("w", new BsonInt32(0));
+        }else {
+            writeConcern = safaop.getQuery();
+        }
+        BsonDocument cmd = new BsonDocument();
+        if(op instanceof InsertOp){
+            int flag = ((InsertOp) op).getFlags();
+            cmd.append("insert", new BsonString(this.name))
+                    .append("documents", new BsonArray(((InsertOp) op).getDocuments()))
+                    .append("writeConcern", writeConcern)
+                    .append("ordered", new BsonBoolean((flag&1) == 0));
+        }
+        if(op instanceof UpdateOp){
+            cmd.append("update", new BsonString(this.name))
+                    .append("updates", new BsonArray());
+        }
     }
 }

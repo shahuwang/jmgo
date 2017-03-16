@@ -40,6 +40,10 @@ public class QueryOp {
         this.serverTags = serverTags;
     }
 
+    public BsonDocument getQuery() {
+        return query;
+    }
+
     public Vector<BsonElement> getServerTags() {
         return serverTags;
     }

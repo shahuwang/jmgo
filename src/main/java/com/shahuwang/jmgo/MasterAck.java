@@ -11,7 +11,7 @@ public class MasterAck {
     private ServerAddr primary;
     private ServerAddr[] hosts;
     private ServerAddr[] passives;
-    private BsonElement[][]Tags;
+    private BsonElement[]Tags;
     private String setName;
     private String msg;
     private int maxWireVersion;
@@ -44,7 +44,7 @@ public class MasterAck {
         return maxWireVersion;
     }
 
-    public BsonElement[][] getTags() {
+    public BsonElement[] getTags() {
         return Tags;
     }
 
