@@ -7,6 +7,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.*;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -85,11 +87,34 @@ public class Collection {
             cmd.append("insert", new BsonString(this.name))
                     .append("documents", new BsonArray(((InsertOp) op).getDocuments()))
                     .append("writeConcern", writeConcern)
-                    .append("ordered", new BsonBoolean((flag&1) == 0));
+                    .append("ordered", new BsonBoolean((flag&1) == 0)); // 这里为什么要这样呢？
         }
         if(op instanceof UpdateOp){
             cmd.append("update", new BsonString(this.name))
-                    .append("updates", new BsonArray());
+                    .append("updates", new BsonArray(Arrays.asList(((UpdateOp) op).encode())))
+                    .append("writeConcern", writeConcern)
+                    .append("ordered", new BsonBoolean(ordered));
+        }
+        if(op instanceof BulkUpdateOp){
+            cmd.append("update", new BsonString(this.name))
+                    .append("updates", ((BulkUpdateOp) op).encode())
+                    .append("writeConcern", writeConcern)
+                    .append("ordered", new BsonBoolean(ordered));
+        }
+        if(op instanceof DeleteOp){
+            cmd.append("delete", new BsonString(this.name))
+                    .append("deletes", new BsonArray(Arrays.asList(((DeleteOp) op).encode())))
+                    .append("writeConcern", writeConcern)
+                    .append("ordered", new BsonBoolean(ordered));
+        }
+        if(op instanceof BulkDeleteOp){
+            cmd.append("delete", new BsonString(this.name))
+                    .append("deletes", ((BulkDeleteOp) op).encode())
+                    .append("writeConcern", writeConcern)
+                    .append("ordered", new BsonBoolean(ordered));
+        }
+        if(bypasssValidation){
+            cmd.append("bypassDocumentValidation", new BsonBoolean(true));
         }
     }
 }
