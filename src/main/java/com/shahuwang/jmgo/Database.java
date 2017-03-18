@@ -10,7 +10,9 @@ public class Database {
     public Database(MongoSession session, String name){
         this.session = session;
         this.name = name;
+        
     }
+
 
     public MongoSession getSession() {
         return session;

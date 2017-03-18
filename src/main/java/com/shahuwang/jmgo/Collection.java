@@ -7,7 +7,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.*;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -24,6 +23,7 @@ public class Collection {
         this.database = database;
         this.name = name;
         this.fullName = fullName;
+
     }
 
     public void inert(BsonDocument ...docs){
@@ -113,6 +113,7 @@ public class Collection {
                     .append("writeConcern", writeConcern)
                     .append("ordered", new BsonBoolean(ordered));
         }
+
         if(bypasssValidation){
             cmd.append("bypassDocumentValidation", new BsonBoolean(true));
         }
