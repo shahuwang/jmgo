@@ -44,6 +44,10 @@ public class QueryOp {
         return query;
     }
 
+    public void setReplyFuncs(IReply replyFuncs) {
+        this.replyFuncs = replyFuncs;
+    }
+
     public Vector<BsonElement> getServerTags() {
         return serverTags;
     }

@@ -1,5 +1,6 @@
 package com.shahuwang.jmgo;
 
+import com.shahuwang.jmgo.exceptions.JmgoException;
 import com.shahuwang.jmgo.exceptions.SocketDeadException;
 
 import java.net.Socket;
@@ -13,6 +14,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
+import org.bson.conversions.Bson;
 
 /**
  * Created by rickey on 2017/2/23.
@@ -95,10 +97,21 @@ public class MongoSocket {
         return null;
     }
 
+    private void kill(JmgoException error, boolean abend){
+
+    }
+
     private void resetNonce(){
         logger.debug("Socket {} to {}: requesting a new nonce", this, this.addr);
         QueryOp op = new QueryOp.QueryOpBuilder("admin.$cmd",
                 new BsonDocument("getnonce", new BsonInt32(1))).limit(-1).build();
+        op.setReplyFuncs((JmgoException dead, ReplyOp reply, int docNum, byte[]docData) -> {
+            if(dead != null){
+                this.kill(new JmgoException("getNonce: " + dead.getMessage()), true);
+                return;
+            }
+            
+        });
 
     }
 }
