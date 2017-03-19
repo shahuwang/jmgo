@@ -14,4 +14,8 @@ public class ReplyOp {
         this.cursortId = cursortId;
         this.firstDoc = firstDoc;
     }
+
+    public int getReplyDocs() {
+        return replyDocs;
+    }
 }

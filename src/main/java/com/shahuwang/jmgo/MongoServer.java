@@ -96,7 +96,7 @@ public class MongoServer {
         }
     }
 
-    public MongoSocket connect(Duration timeout)throws  ConnectionException{
+    public MongoSocket connect(Duration timeout)throws  ConnectionException, SocketDeadException{
         this.rwlock.readLock().lock();
         boolean master = this.serverInfo.isMaster();
         IDialer dialer = this.dialer;
