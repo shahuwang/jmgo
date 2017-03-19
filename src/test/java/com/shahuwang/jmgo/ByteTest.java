@@ -13,5 +13,6 @@ public class ByteTest extends TestCase{
     public void testGetInt(){
         String s = "abcd";
         System.out.println(getInt32(s.getBytes(), 0));
+        System.out.println(s instanceof String);
     }
 }

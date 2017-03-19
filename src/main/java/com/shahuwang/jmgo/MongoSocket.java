@@ -8,8 +8,7 @@ import java.io.InputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -17,6 +16,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bson.BsonDocument;
 import org.bson.BsonInt32;
+import org.omg.PortableInterceptor.RequestInfo;
 
 
 /**
@@ -51,6 +51,19 @@ public class MongoSocket {
 
     }
 
+    public void query(Object ...ops){
+        List<Object> nops = Arrays.asList(ops);
+        Object[] lops = this.flushLogout();
+        if(lops.length > 0){
+            nops.addAll(Arrays.asList(lops));
+        }
+        List<Byte> buf = new ArrayList<>(256);
+        List<RequestInfo> requests = new ArrayList<>(nops.size());
+        int requestCount = 0;
+        for(Object op: ops){
+
+        }
+    }
     public void initialAcquire(ServerInfo serverInfo, Duration timeout) throws SocketDeadException{
         this.lock.lock();
         if(this.references > 0){
@@ -101,7 +114,12 @@ public class MongoSocket {
     }
 
     private void kill(JmgoException error, boolean abend){
+        //TODO
+    }
 
+    private Object[] flushLogout(){
+        //TODO
+        return new Object[0];
     }
 
     private void readLoop() {
